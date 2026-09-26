@@ -84,3 +84,12 @@ Optional later structures: playlist membership, language, alternate take, respon
 - interpretation presented as scripture
 
 The first crater should prove that many people can produce one continuous audible traversal without collapsing their individual witness records.
+
+
+## Canonical contribution law
+
+See [CANON-001 — FREE WITNESS](CANON-001-FREE-WITNESS.md).
+
+> **WITNESS does not distribute Scripture among people. People approach Scripture freely. WITNESS preserves what they leave there and composes from abundance.**
+
+The alternating-reader prototype is one bounded collaboration experiment, not the core contribution ontology.
