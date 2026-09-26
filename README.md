@@ -9,6 +9,16 @@ A community audio Bible: Scripture remains addressable and stable; human reading
 
 WITNESS treats scripture text, translation, reading, reader, recording, and relation as distinct layers.
 
+## Canonical contribution law
+
+See [CANON-001 — FREE WITNESS](docs/CANON-001-FREE-WITNESS.md).
+
+> **WITNESS does not distribute Scripture among people.  
+> People approach Scripture freely.  
+> WITNESS preserves what they leave there and composes from abundance.**
+
+The core contribution primitive is a person freely leaving a recording at a passage address. Assignment systems and rooms are optional composition/gathering tools, not the ontology.
+
 ## Current executable: ROOM-001
 
 `prototype/` is a no-build browser recorder for **Matthew 5** with two modes:
