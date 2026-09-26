@@ -11,7 +11,7 @@
   <header class="hero">
     <p class="kicker">WITNESS / SLICE-001</p>
     <h1>Matthew 5<br><span>two voices, one chapter</span></h1>
-    <p class="lede">Alternate verses. Keep every take witnessed. Merge the two phones later.</p>
+    <p class="lede">Record one verse. The room assembles the chapter while both phones keep their own receipts.</p>
   </header>
 
   <main>
@@ -43,12 +43,27 @@
         </select>
       </label>
 
+      <div class="room-panel">
+        <div class="room-line">
+          <span id="roomBadge" class="room-badge">local only</span>
+          <span id="roomMembers" class="room-members">No shared room yet.</span>
+        </div>
+        <div class="room-actions">
+          <button id="createRoom" class="primary">Start shared room</button>
+          <input id="roomCode" autocomplete="off" placeholder="Paste room link or UUID" />
+          <button id="joinRoom">Join room</button>
+          <button id="copyRoomLink" hidden>Copy room link</button>
+        </div>
+        <p id="roomHint" class="room-hint">Recordings are always kept locally first. A shared room adds automatic sync.</p>
+      </div>
+
       <div class="actions">
+        <button id="nextMine" class="primary">Next mine</button>
         <button id="playChapter" class="primary">Play assembled chapter</button>
         <button id="stopChapter">Stop</button>
-        <button id="exportPackage">Export WITNESS package</button>
+        <button id="exportPackage">Export backup package</button>
         <label class="file-button">
-          Import partner package
+          Import backup package
           <input id="importPackage" type="file" accept=".json,application/json" />
         </label>
       </div>
@@ -68,10 +83,10 @@
   </main>
 
   <footer>
-    <p><strong>Witness law:</strong> a new take does not erase an old one. This prototype plays the newest available take while retaining earlier takes locally.</p>
+    <p><strong>Witness law:</strong> a new take does not erase an old one. The local receipt is created first; shared-room sync only adds another witnessed copy.</p>
     <p>Source: <a href="https://ebible.org/engwebp/MAT05.htm" target="_blank" rel="noreferrer">eBible.org — World English Bible, Matthew 5</a>.</p>
   </footer>
 
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
