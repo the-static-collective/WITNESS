@@ -148,7 +148,10 @@ export const roomSync = {
         reader_slot: readerSlot
       });
 
-    if (error && error.code !== "23505") throw error;
+    if (error?.code === "23505") {
+      throw new Error("That reader slot is already occupied in this room.");
+    }
+    if (error) throw error;
 
     await this.connect(resolved);
   },
