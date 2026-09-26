@@ -9,24 +9,43 @@ A community audio Bible: Scripture remains addressable and stable; human reading
 
 WITNESS treats scripture text, translation, reading, reader, recording, and relation as distinct layers.
 
-## First executable slice
+## Current executable: ROOM-001
 
-`prototype/` is a no-build browser recorder for **Matthew 5**.
+`prototype/` is a no-build browser recorder for **Matthew 5** with two modes:
 
-It is configured for two readers:
+- **Local-only:** record verses into IndexedDB and exchange backup packages manually.
+- **Shared room:** two phones join the same Supabase-backed room and the chapter assembles live.
 
-- Voice A reads odd verses.
-- Voice B reads even verses.
-- Each phone retains every recorded take locally.
-- Either reader can export one WITNESS package.
-- Importing the partner package merges recordings by immutable ID and verifies SHA-256.
-- **Play assembled chapter** walks Matthew 5 in verse order using the newest available take for each verse.
+Voice A reads odd verses and Voice B reads even verses.
 
-No account or backend is required for this first proof.
+The shared-room path preserves the original local-first law:
 
-After this branch lands on `main`, the included GitHub Pages workflow can publish `prototype/` as the microphone-capable HTTPS surface.
+```
+voice -> local recording -> SHA-256 receipt -> sync -> shared availability
+```
 
-See [SLICE-001 — TWO-VOICE CHAPTER](docs/SLICE-001-TWO-VOICE-CHAPTER.md).
+Supabase does not decide whether the recording happened; it makes independently recorded witnesses available to the room.
+
+See:
+
+- [GENESIS-001](docs/GENESIS-001.md)
+- [SLICE-001 — TWO-VOICE CHAPTER](docs/SLICE-001-TWO-VOICE-CHAPTER.md)
+- [ROOM-001 — SHARED CHAPTER](docs/ROOM-001-SHARED-CHAPTER.md)
+- [Supabase ROOM-001 contract](supabase/room-001.sql)
+
+## Backend
+
+WITNESS has its own Supabase project.
+
+ROOM-001 uses:
+
+- anonymous Supabase Auth sessions
+- RLS-controlled rooms and membership
+- append-only recording receipts
+- a private `witness-audio` Storage bucket
+- realtime inserts for recordings and members
+
+The public browser contains only a Supabase publishable key. No service-role/secret credential is shipped to the frontend.
 
 ## Text rights
 
