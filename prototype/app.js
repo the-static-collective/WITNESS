@@ -1,3 +1,5 @@
+import { roomSync } from "./room-sync.js";
+
 const CHAPTER = {
   id: "matthew.5",
   work: "Bible",
@@ -117,21 +119,31 @@ async function dbPut(record) {
 }
 
 function assignedReader(verse) {
-  return verse % 2 === 1 ? { slot: "A", name: state.readerA } : { slot: "B", name: state.readerB };
+  const slot = verse % 2 === 1 ? "A" : "B";
+  const localName = slot === "A" ? state.readerA : state.readerB;
+  return { slot, name: roomSync.nameForSlot(slot) || localName };
+}
+
+function allRecords() {
+  const merged = new Map();
+  for (const record of roomSync.state.recordings || []) merged.set(record.recording_id, record);
+  for (const record of state.records) merged.set(record.recording_id, record);
+  return [...merged.values()];
 }
 
 function latestForVerse(verse) {
-  return state.records
+  return allRecords()
     .filter(r => r.verse === verse)
     .sort((a, b) => new Date(b.recorded_at) - new Date(a.recorded_at))[0] || null;
 }
 
 function takesForVerse(verse) {
-  return state.records.filter(r => r.verse === verse).length;
+  return allRecords().filter(r => r.verse === verse).length;
 }
 
-function audioUrl(record) {
-  return record ? URL.createObjectURL(record.audio_blob) : null;
+async function audioUrl(record) {
+  const blob = await roomSync.audioBlob(record);
+  return URL.createObjectURL(blob);
 }
 
 function safeName(value) {
@@ -154,13 +166,160 @@ async function refresh() {
   render();
 }
 
+function renderRoomPanel() {
+  const connected = Boolean(roomSync.state.roomId && roomSync.currentMember());
+  const badge = $("roomBadge");
+  const members = $("roomMembers");
+  const hint = $("roomHint");
+  const roomCode = $("roomCode");
+
+  badge.textContent = connected ? "shared · live" : "local only";
+  badge.classList.toggle("live", connected);
+
+  if (connected) {
+    const names = roomSync.state.members
+      .filter(member => member.reader_slot === "A" || member.reader_slot === "B")
+      .map(member => member.display_name + " · Voice " + member.reader_slot);
+    members.textContent = names.length ? names.join(" / ") : "Shared room connected.";
+    hint.textContent = "Local receipt first · private audio sync · realtime chapter assembly.";
+    roomCode.value = roomSync.state.roomId;
+    $("createRoom").hidden = true;
+    $("joinRoom").hidden = true;
+    roomCode.hidden = true;
+    $("copyRoomLink").hidden = false;
+    $("deviceReader").disabled = true;
+  } else {
+    members.textContent = roomSync.state.joinCandidate
+      ? "Room link detected. Choose your voice and join."
+      : "No shared room yet.";
+    roomCode.hidden = false;
+    if (roomSync.state.joinCandidate && !roomCode.value) roomCode.value = roomSync.state.joinCandidate;
+    $("createRoom").hidden = false;
+    $("joinRoom").hidden = false;
+    $("copyRoomLink").hidden = true;
+    $("deviceReader").disabled = false;
+
+    if (roomSync.state.error) {
+      hint.textContent = "Cloud unavailable: " + roomSync.state.error + " Local recording still works.";
+    } else if (roomSync.state.authReady) {
+      hint.textContent = "Cloud identity ready. Start a room or join one; no email account is required.";
+    } else {
+      hint.textContent = "Recordings are always kept locally first. Shared-room identity is initializing.";
+    }
+  }
+}
+
+async function markSynced(results) {
+  if (!results?.length) return;
+  for (const result of results) {
+    const record = state.records.find(item => item.recording_id === result.recording_id);
+    if (!record) continue;
+    record.synced_room_id = roomSync.state.roomId;
+    record.storage_path = result.storage_path;
+    record.sync_state = "synced";
+    await dbPut(record);
+  }
+  await refresh();
+}
+
+async function syncLocalRecord(record) {
+  if (!roomSync.state.roomId) return;
+  try {
+    const result = await roomSync.syncRecord(record);
+    if (!result?.synced) return;
+    record.synced_room_id = roomSync.state.roomId;
+    record.storage_path = result.storagePath;
+    record.sync_state = "synced";
+    await dbPut(record);
+    await refresh();
+    status("Witnessed locally + shared to room: Matthew 5:" + record.verse + ".");
+  } catch (error) {
+    record.sync_state = "pending";
+    await dbPut(record);
+    await refresh();
+    status("Witnessed locally. Shared-room sync is pending: " + error.message);
+  }
+}
+
+async function syncPendingLocal() {
+  if (!roomSync.state.roomId) return;
+  const results = await roomSync.syncPending(state.records);
+  await markSynced(results);
+}
+
+async function createSharedRoom() {
+  try {
+    const slot = state.deviceReader;
+    const displayName = slot === "A" ? state.readerA : state.readerB;
+    status("Opening shared Matthew 5 room…");
+    await roomSync.createRoom({
+      title: "Matthew 5 — " + state.readerA + " + " + state.readerB,
+      displayName,
+      readerSlot: slot,
+      passageId: CHAPTER.id,
+      editionId: CHAPTER.edition.id
+    });
+    await syncPendingLocal();
+    render();
+    status("Shared room is live. Copy the room link and send it to the other reader.");
+  } catch (error) {
+    status("Could not start shared room: " + error.message);
+  }
+}
+
+async function joinSharedRoom() {
+  try {
+    const slot = state.deviceReader;
+    const displayName = slot === "A" ? state.readerA : state.readerB;
+    status("Joining shared room…");
+    await roomSync.joinRoom({
+      roomId: $("roomCode").value,
+      displayName,
+      readerSlot: slot
+    });
+    await syncPendingLocal();
+    render();
+    status("Joined. Your witnessed verses will now sync automatically.");
+  } catch (error) {
+    status("Could not join room: " + error.message);
+  }
+}
+
+async function copyRoomLink() {
+  try {
+    await roomSync.copyShareUrl();
+    status("Room link copied.");
+  } catch (error) {
+    status("Could not copy room link: " + error.message);
+  }
+}
+
+function nextMine() {
+  const activeSlot = roomSync.currentSlot() || state.deviceReader;
+  const next = CHAPTER.verses.find(([verse]) => assignedReader(verse).slot === activeSlot && !latestForVerse(verse));
+  if (!next) {
+    status("Your assigned verses are all witnessed.");
+    return;
+  }
+  const row = versesEl.querySelector('[data-verse="' + next[0] + '"]');
+  versesEl.querySelectorAll(".is-next").forEach(el => el.classList.remove("is-next"));
+  row?.classList.add("is-next");
+  row?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function render() {
-  $("readerA").value = state.readerA;
-  $("readerB").value = state.readerB;
-  $("deviceReader").value = state.deviceReader;
+  const cloudA = roomSync.nameForSlot("A");
+  const cloudB = roomSync.nameForSlot("B");
+  $("readerA").value = cloudA || state.readerA;
+  $("readerB").value = cloudB || state.readerB;
+  $("readerA").disabled = Boolean(cloudA);
+  $("readerB").disabled = Boolean(cloudB);
+  $("deviceReader").value = roomSync.currentSlot() || state.deviceReader;
+  renderRoomPanel();
 
   versesEl.innerHTML = "";
   let complete = 0;
+  const activeSlot = roomSync.currentSlot() || state.deviceReader;
 
   for (const [verse, text] of CHAPTER.verses) {
     const assigned = assignedReader(verse);
@@ -168,7 +327,7 @@ function render() {
     if (latest) complete += 1;
 
     const row = document.createElement("article");
-    row.className = "verse" + (assigned.slot === state.deviceReader ? " assigned-here" : "");
+    row.className = "verse" + (assigned.slot === activeSlot ? " assigned-here" : "");
     row.dataset.verse = verse;
 
     const top = document.createElement("div");
@@ -194,7 +353,7 @@ function render() {
     const record = document.createElement("button");
     record.className = "record";
     record.textContent = state.recordingVerse === verse ? "Stop & keep take" : latest ? "Record another take" : "Record verse";
-    record.disabled = assigned.slot !== state.deviceReader || (state.recordingVerse !== null && state.recordingVerse !== verse);
+    record.disabled = assigned.slot !== activeSlot || (state.recordingVerse !== null && state.recordingVerse !== verse);
     if (state.recordingVerse === verse) record.classList.add("recording");
     record.addEventListener("click", () => toggleRecording(verse));
 
@@ -264,14 +423,16 @@ async function toggleRecording(verse) {
           identity_mode: "pseudonymous",
           recorded_at: now,
           submitted_at: now,
-          recording_license: "contributor-permission-local-prototype",
+          recording_license: roomSync.state.roomId ? "contributor-permission-room-001" : "contributor-permission-local-prototype",
           media_type: blob.type,
           sha256: await sha256(blob),
           audio_blob: blob,
+          sync_state: roomSync.state.roomId ? "pending" : "local",
           relations: []
         };
         await dbPut(record);
-        status("Witnessed Matthew 5:" + verse + " — " + assigned.name + ". Earlier takes remain in local provenance.");
+        void syncLocalRecord(record);
+        status("Witnessed Matthew 5:" + verse + " — " + assigned.name + ". Local receipt saved.");
       } finally {
         state.stream?.getTracks().forEach(track => track.stop());
         state.stream = null;
@@ -294,24 +455,32 @@ async function toggleRecording(verse) {
   }
 }
 
-function playRecord(record) {
+async function playRecord(record) {
   if (!record) return;
-  const url = audioUrl(record);
-  const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
-  audio.onerror = () => URL.revokeObjectURL(url);
-  audio.play().catch(error => status("Playback error: " + error.message));
+  try {
+    const url = await audioUrl(record);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onerror = () => URL.revokeObjectURL(url);
+    await audio.play();
+  } catch (error) {
+    status("Playback error: " + error.message);
+  }
 }
 
-function downloadRecord(record) {
+async function downloadRecord(record) {
   if (!record) return;
-  const extension = record.media_type.includes("ogg") ? "ogg" : record.media_type.includes("mp4") ? "m4a" : "webm";
-  const a = document.createElement("a");
-  const url = audioUrl(record);
-  a.href = url;
-  a.download = "matthew-5-v" + String(record.verse).padStart(2, "0") + "__" + safeName(record.reader_name) + "__" + record.recording_id.slice(-8) + "." + extension;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  try {
+    const extension = record.media_type.includes("ogg") ? "ogg" : record.media_type.includes("mp4") ? "m4a" : "webm";
+    const a = document.createElement("a");
+    const url = await audioUrl(record);
+    a.href = url;
+    a.download = "matthew-5-v" + String(record.verse).padStart(2, "0") + "__" + safeName(record.reader_name) + "__" + record.recording_id.slice(-8) + "." + extension;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    status("Download error: " + error.message);
+  }
 }
 
 async function playChapter() {
@@ -335,9 +504,9 @@ async function playChapter() {
   if (token === state.chapterAbort) status("Chapter playback finished.");
 }
 
-function playAndWait(record, token) {
+async function playAndWait(record, token) {
+  const url = await audioUrl(record);
   return new Promise(resolve => {
-    const url = audioUrl(record);
     const audio = new Audio(url);
     const done = () => {
       URL.revokeObjectURL(url);
@@ -468,9 +637,24 @@ function persistReaders() {
 $("readerA").addEventListener("change", persistReaders);
 $("readerB").addEventListener("change", persistReaders);
 $("deviceReader").addEventListener("change", persistReaders);
+$("createRoom").addEventListener("click", createSharedRoom);
+$("joinRoom").addEventListener("click", joinSharedRoom);
+$("copyRoomLink").addEventListener("click", copyRoomLink);
+$("nextMine").addEventListener("click", nextMine);
 $("playChapter").addEventListener("click", playChapter);
 $("stopChapter").addEventListener("click", stopChapter);
 $("exportPackage").addEventListener("click", exportPackage);
 $("importPackage").addEventListener("change", event => importPackage(event.target.files?.[0]));
 
-refresh().catch(error => status("Local storage error: " + error.message));
+async function boot() {
+  try {
+    await refresh();
+    await roomSync.initialize(() => render());
+    if (roomSync.state.roomId) await syncPendingLocal();
+    render();
+  } catch (error) {
+    status("Startup error: " + error.message);
+  }
+}
+
+boot();
