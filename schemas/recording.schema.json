@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/the-static-collective/WITNESS/schemas/recording.schema.json",
+  "title": "WITNESS Recording",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recording_id",
+    "passage",
+    "text_edition",
+    "audio",
+    "contribution",
+    "reader"
+  ],
+  "properties": {
+    "recording_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "passage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["work", "start"],
+      "properties": {
+        "work": { "type": "string" },
+        "start": { "type": "string" },
+        "end": { "type": ["string", "null"] }
+      }
+    },
+    "text_edition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edition_id", "declared_by_contributor"],
+      "properties": {
+        "edition_id": { "type": "string" },
+        "declared_by_contributor": { "const": true },
+        "rights_note": { "type": ["string", "null"] }
+      }
+    },
+    "reader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity_mode"],
+      "properties": {
+        "identity_mode": {
+          "enum": ["public", "pseudonymous", "anonymous", "undisclosed"]
+        },
+        "reader_id": { "type": ["string", "null"] },
+        "display_name": { "type": ["string", "null"] }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_uri", "media_type", "sha256"],
+      "properties": {
+        "artifact_uri": { "type": "string" },
+        "media_type": { "type": "string" },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "duration_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "contribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recorded_at", "submitted_at", "recording_license"],
+      "properties": {
+        "recorded_at": { "type": ["string", "null"], "format": "date-time" },
+        "submitted_at": { "type": "string", "format": "date-time" },
+        "recording_license": { "type": "string" },
+        "provenance_note": { "type": ["string", "null"] }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "target"],
+        "properties": {
+          "type": { "type": "string" },
+          "target": { "type": "string" }
+        }
+      },
+      "default": []
+    }
+  }
+}

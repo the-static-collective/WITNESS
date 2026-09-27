@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <title>WITNESS — Matthew 5</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="kicker">WITNESS / SLICE-001</p>
+    <h1>Matthew 5<br><span>two voices, one chapter</span></h1>
+    <p class="lede">Record one verse. The room assembles the chapter while both phones keep their own receipts.</p>
+  </header>
+
+  <main>
+    <section class="panel setup" aria-labelledby="setup-title">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Session</p>
+          <h2 id="setup-title">Who is reading?</h2>
+        </div>
+        <div id="progress" class="progress">0 / 48 witnessed</div>
+      </div>
+
+      <div class="reader-grid">
+        <label>
+          <span>Voice A · odd verses</span>
+          <input id="readerA" value="Lu" autocomplete="off" />
+        </label>
+        <label>
+          <span>Voice B · even verses</span>
+          <input id="readerB" value="Paula" autocomplete="off" />
+        </label>
+      </div>
+
+      <label class="device-select">
+        <span>This device is</span>
+        <select id="deviceReader">
+          <option value="A">Voice A</option>
+          <option value="B">Voice B</option>
+        </select>
+      </label>
+
+      <div class="room-panel">
+        <div class="room-line">
+          <span id="roomBadge" class="room-badge">local only</span>
+          <span id="roomMembers" class="room-members">No shared room yet.</span>
+        </div>
+        <div class="room-actions">
+          <button id="createRoom" class="primary">Start shared room</button>
+          <input id="roomCode" autocomplete="off" placeholder="Paste room link or UUID" />
+          <button id="joinRoom">Join room</button>
+          <button id="copyRoomLink" hidden>Copy room link</button>
+        </div>
+        <p id="roomHint" class="room-hint">Recordings are always kept locally first. A shared room adds automatic sync.</p>
+      </div>
+
+      <div class="actions">
+        <button id="nextMine" class="primary">Next mine</button>
+        <button id="playChapter" class="primary">Play assembled chapter</button>
+        <button id="stopChapter">Stop</button>
+        <button id="exportPackage">Export backup package</button>
+        <label class="file-button">
+          Import backup package
+          <input id="importPackage" type="file" accept=".json,application/json" />
+        </label>
+      </div>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="chapter-meta">
+      <div>
+        <p class="eyebrow">Reading text</p>
+        <h2>World English Bible · Matthew 5</h2>
+      </div>
+      <p>Public-domain reading text. Footnote markers are omitted from this recording surface; wording follows the current WEB Protestant Edition source.</p>
+    </section>
+
+    <section id="verses" class="verses" aria-label="Matthew 5 verses"></section>
+  </main>
+
+  <footer>
+    <p><strong>Witness law:</strong> a new take does not erase an old one. The local receipt is created first; shared-room sync only adds another witnessed copy.</p>
+    <p>Source: <a href="https://ebible.org/engwebp/MAT05.htm" target="_blank" rel="noreferrer">eBible.org — World English Bible, Matthew 5</a>.</p>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
