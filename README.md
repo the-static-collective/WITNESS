@@ -1,5 +1,7 @@
 # WITNESS
 
+> **Static Collective compass:** [Front Room](https://github.com/the-static-collective/What-is-the-static-collective-) · [Living Git Map](https://github.com/the-static-collective/What-is-the-static-collective-/tree/main/atlas)
+
 A community audio Bible: Scripture remains addressable and stable; human readings accumulate around it as witnessed recordings.
 
 ## Foundational law
