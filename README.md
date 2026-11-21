@@ -19,6 +19,14 @@ See [CANON-001 — FREE WITNESS](docs/CANON-001-FREE-WITNESS.md).
 
 The core contribution primitive is a person freely leaving a recording at a passage address. Assignment systems and rooms are optional composition/gathering tools, not the ontology.
 
+## Native WITNESS game: FREEPLAY-001 — The Living Chapter
+
+The browser recorder has an independent **cooperative chapter expedition** documented in [FREEPLAY-001](docs/FREEPLAY-001-LIVING-CHAPTER.md). Players freely choose a passage, record immutable takes, discover unanswered addresses, hear other voices and collect constellations as the Matthew 5 mosaic expands. The earlier odd/even duet experiment is now opt-in; free Scripture reading is default.
+
+Bounded chapter glimmers measure recorded passage coverage and completed local audio playback, not human worth or spiritual faithfulness. A new take never erases an old one; no compelled quotas, exclusive passage ownership or automated Full Measure award. The original WITNESS v1 backup can be manually imported into THE PACT v0.4's WITNESS tab, and the separate Full Measure [return lens PR #59](https://github.com/the-static-collective/full-measure-world-layer/pull/59) remains read-only and zero-award.
+
+**Tests:** `node --test prototype/game.test.mjs`.
+
 ## Current executable: ROOM-001
 
 `prototype/` is a no-build browser recorder for **Matthew 5** with two modes:
