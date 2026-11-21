@@ -1,4 +1,5 @@
 import { roomSync } from "./room-sync.js";
+import { summarizeWitnessGame, suggestOpenDoor, suggestUnheardVoice, makePlaybackReceipt, addPlaybackReceipt, makeGameReviewPacket } from "./game.mjs";
 
 const CHAPTER = {
   id: "matthew.5",
@@ -63,12 +64,19 @@ const CHAPTER = {
   ]
 };
 
+const PLAYBACK_KEY = "witness.local-playback.v1";
+function loadPlaybacks() {
+ try { const v = JSON.parse(localStorage.getItem(PLAYBACK_KEY) || "[]"); return Array.isArray(v) ? v.slice(-2000) : []; }
+ catch { return []; }
+}
 const DB_NAME = "witness-local-v1";
 const STORE = "recordings";
 const state = {
   readerA: localStorage.getItem("witness.readerA") || "Lu",
   readerB: localStorage.getItem("witness.readerB") || "Paula",
   deviceReader: localStorage.getItem("witness.deviceReader") || "A",
+  duetMode: localStorage.getItem("witness.duetMode") === "true",
+  playbacks: loadPlaybacks(),
   records: [],
   recorder: null,
   recordingVerse: null,
@@ -123,6 +131,12 @@ function assignedReader(verse) {
   const localName = slot === "A" ? state.readerA : state.readerB;
   return { slot, name: roomSync.nameForSlot(slot) || localName };
 }
+function currentVoice() {
+ const slot = roomSync.currentSlot() || state.deviceReader;
+ const localName = slot === "A" ? state.readerA : state.readerB;
+ return { slot, name: roomSync.nameForSlot(slot) || localName };
+}
+
 
 function allRecords() {
   const merged = new Map();
@@ -294,17 +308,20 @@ async function copyRoomLink() {
   }
 }
 
+function moveToVerse(verse, message = "") {
+ const row = versesEl.querySelector('[data-verse="' + verse + '"]');
+ if (!row) return;
+ versesEl.querySelectorAll(".is-next").forEach(el => el.classList.remove("is-next"));
+ row.classList.add("is-next");
+ row.scrollIntoView({ behavior: "smooth", block: "center" });
+ if (message) { status(message); $("gamePrompt").textContent = message; }
+}
 function nextMine() {
-  const activeSlot = roomSync.currentSlot() || state.deviceReader;
-  const next = CHAPTER.verses.find(([verse]) => assignedReader(verse).slot === activeSlot && !latestForVerse(verse));
-  if (!next) {
-    status("Your assigned verses are all witnessed.");
-    return;
-  }
-  const row = versesEl.querySelector('[data-verse="' + next[0] + '"]');
-  versesEl.querySelectorAll(".is-next").forEach(el => el.classList.remove("is-next"));
-  row?.classList.add("is-next");
-  row?.scrollIntoView({ behavior: "smooth", block: "center" });
+ const selected = state.duetMode
+  ? CHAPTER.verses.find(([verse]) => assignedReader(verse).slot === currentVoice().slot && !latestForVerse(verse))
+  : CHAPTER.verses.find(([verse]) => !latestForVerse(verse));
+ if (!selected) { status("Every address has a witness. Another take is always welcome."); return; }
+ moveToVerse(selected[0], "An open door: Matthew 5:" + selected[0] + ". Entirely your choice.");
 }
 
 function render() {
@@ -316,6 +333,7 @@ function render() {
   $("readerB").disabled = Boolean(cloudB);
   $("deviceReader").value = roomSync.currentSlot() || state.deviceReader;
   renderRoomPanel();
+  $("duetMode").checked = state.duetMode;
 
   versesEl.innerHTML = "";
   let complete = 0;
@@ -327,7 +345,7 @@ function render() {
     if (latest) complete += 1;
 
     const row = document.createElement("article");
-    row.className = "verse" + (assigned.slot === activeSlot ? " assigned-here" : "");
+    row.className = "verse" + (state.duetMode && assigned.slot === activeSlot ? " assigned-here" : "");
     row.dataset.verse = verse;
 
     const top = document.createElement("div");
@@ -338,8 +356,8 @@ function render() {
     number.textContent = "Matthew 5:" + verse;
 
     const who = document.createElement("span");
-    who.className = "assignee";
-    who.textContent = assigned.name;
+    who.className = "assignee" + (state.duetMode ? "" : " free");
+    who.textContent = state.duetMode ? "Duet: " + assigned.name : "Free to read";
 
     top.append(number, who);
 
@@ -353,7 +371,7 @@ function render() {
     const record = document.createElement("button");
     record.className = "record";
     record.textContent = state.recordingVerse === verse ? "Stop & keep take" : latest ? "Record another take" : "Record verse";
-    record.disabled = assigned.slot !== activeSlot || (state.recordingVerse !== null && state.recordingVerse !== verse);
+    record.disabled = (state.duetMode && assigned.slot !== activeSlot) || (state.recordingVerse !== null && state.recordingVerse !== verse);
     if (state.recordingVerse === verse) record.classList.add("recording");
     record.addEventListener("click", () => toggleRecording(verse));
 
@@ -378,7 +396,8 @@ function render() {
     versesEl.append(row);
   }
 
-  $("progress").textContent = complete + " / " + CHAPTER.verses.length + " witnessed";
+  $("progress").textContent = complete + " / " + CHAPTER.verses.length + " passage addresses";
+  renderGame();
 }
 
 async function toggleRecording(verse) {
@@ -409,7 +428,7 @@ async function toggleRecording(verse) {
     recorder.onstop = async () => {
       try {
         const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
-        const assigned = assignedReader(verse);
+        const assigned = state.duetMode ? assignedReader(verse) : currentVoice();
         const now = new Date().toISOString();
         const recordingId = "wit-" + CHAPTER.id.replace(".", "-") + "-v" + String(verse).padStart(3, "0") + "-" + crypto.randomUUID();
         const record = {
@@ -460,7 +479,7 @@ async function playRecord(record) {
   try {
     const url = await audioUrl(record);
     const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onended = () => { URL.revokeObjectURL(url); recordPlaybackCompletion(record); };
     audio.onerror = () => URL.revokeObjectURL(url);
     await audio.play();
   } catch (error) {
@@ -505,26 +524,23 @@ async function playChapter() {
 }
 
 async function playAndWait(record, token) {
-  const url = await audioUrl(record);
-  return new Promise(resolve => {
-    const audio = new Audio(url);
-    const done = () => {
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    audio.onended = done;
-    audio.onerror = done;
-    audio.play().catch(done);
-
-    const watcher = setInterval(() => {
-      if (token !== state.chapterAbort) {
-        clearInterval(watcher);
-        audio.pause();
-        done();
-      }
-      if (audio.ended) clearInterval(watcher);
-    }, 150);
-  });
+ const url = await audioUrl(record);
+ return new Promise(resolve => {
+  const audio = new Audio(url);
+  let settled = false, watcher;
+  const done = heardToEnd => {
+   if (settled) return;
+   settled = true;
+   clearInterval(watcher);
+   URL.revokeObjectURL(url);
+   if (heardToEnd && token === state.chapterAbort) recordPlaybackCompletion(record);
+   resolve();
+  };
+  audio.onended = () => done(true);
+  audio.onerror = () => done(false);
+  watcher = setInterval(() => { if (token !== state.chapterAbort) {audio.pause();done(false);} }, 150);
+  audio.play().catch(() => done(false));
+ });
 }
 
 function stopChapter() {
@@ -575,11 +591,11 @@ async function exportPackage() {
       text_edition: CHAPTER.edition
     },
     session: {
-      strategy: "alternating-verses",
+      strategy: state.duetMode ? "alternating-verses" : "free-witness",
       reader_a: state.readerA,
       reader_b: state.readerB,
-      odd_verses: "A",
-      even_verses: "B"
+      odd_verses: state.duetMode ? "A" : null,
+      even_verses: state.duetMode ? "B" : null
     },
     recordings: exported
   };
