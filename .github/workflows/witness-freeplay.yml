@@ -1,0 +1,32 @@
+name: WITNESS Freeplay Checks
+
+on:
+  push:
+    branches:
+      - feature/free-witness-expedition-001
+      - genesis/community-audio-bible-001
+  pull_request:
+    branches:
+      - genesis/community-audio-bible-001
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freeplay-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify WITNESS game module syntax
+        run: node --check prototype/game.mjs
+      - name: Verify browser recorder module syntax
+        run: node --check --input-type=module < prototype/app.js
+      - name: Run native WITNESS game fixtures
+        run: node --test prototype/game.test.mjs

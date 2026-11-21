@@ -1,0 +1,31 @@
+{
+  "recording_id": "wit_000001",
+  "passage": {
+    "work": "Bible",
+    "start": "john.1.1",
+    "end": null
+  },
+  "text_edition": {
+    "edition_id": "example-edition",
+    "declared_by_contributor": true,
+    "rights_note": "Placeholder only; no translation text bundled."
+  },
+  "reader": {
+    "identity_mode": "pseudonymous",
+    "reader_id": "reader_001",
+    "display_name": "Example Witness"
+  },
+  "audio": {
+    "artifact_uri": "witness://audio/wit_000001",
+    "media_type": "audio/ogg",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "duration_ms": null
+  },
+  "contribution": {
+    "recorded_at": null,
+    "submitted_at": "2026-09-25T00:00:00Z",
+    "recording_license": "UNSET",
+    "provenance_note": "Noncanonical example record."
+  },
+  "relations": []
+}
