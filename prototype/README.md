@@ -33,3 +33,13 @@ Microphone capture on normal phone deployment requires HTTPS.
 Package export/import remains available.
 
 A failed network sync does not delete or invalidate a local recording. The UI reports the take as locally witnessed and leaves it available for retry.
+
+## Native freeplay: The Living Chapter
+
+The WITNESS game panel is built into `index.html` with `game.mjs` as a pure, no-build, record-derived engine. It supports freely chosen readings by default, an optional odd/even duet, "open passage" exploration, cooperative coverage, local audio-playback receipts, and milestone constellations. Reading another take is welcome without unlimited repeat scoring.
+
+The original `witness-package` v1 export containing locally stored audio remains the format accepted by THE PACT v0.4's private WITNESS tab. The separate `Export game review packet` contains metadata only, excludes shared-room invitation UUIDs and awards zero Deeds, Harvests and Capacity.
+
+No new Supabase credentials, permissions, game cloud state, quota or automatic audio upload are added. Optional WITNESS shared-room sync remains separate; the game works with locally available recordings.
+
+Run `node --test prototype/game.test.mjs` for nine deterministic fixtures. Physical mobile microphone / two-phone field tests remain outstanding.

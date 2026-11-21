@@ -111,7 +111,7 @@ export const roomSync = {
         work: "Bible",
         passage_id: passageId,
         edition_id: editionId,
-        assignment_strategy: "alternating-verses",
+        assignment_strategy: "free-witness",
         created_by: this.state.userId
       })
       .select("id,title,passage_id,edition_id,assignment_strategy,is_open,created_at")

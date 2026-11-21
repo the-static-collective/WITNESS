@@ -1,4 +1,5 @@
 import { roomSync } from "./room-sync.js";
+import { summarizeWitnessGame, suggestOpenDoor, suggestUnheardVoice, makePlaybackReceipt, addPlaybackReceipt, makeGameReviewPacket } from "./game.mjs";
 
 const CHAPTER = {
   id: "matthew.5",
@@ -63,12 +64,19 @@ const CHAPTER = {
   ]
 };
 
+const PLAYBACK_KEY = "witness.local-playback.v1";
+function loadPlaybacks() {
+ try { const v = JSON.parse(localStorage.getItem(PLAYBACK_KEY) || "[]"); return Array.isArray(v) ? v.slice(-2000) : []; }
+ catch { return []; }
+}
 const DB_NAME = "witness-local-v1";
 const STORE = "recordings";
 const state = {
   readerA: localStorage.getItem("witness.readerA") || "Lu",
   readerB: localStorage.getItem("witness.readerB") || "Paula",
   deviceReader: localStorage.getItem("witness.deviceReader") || "A",
+  duetMode: localStorage.getItem("witness.duetMode") === "true",
+  playbacks: loadPlaybacks(),
   records: [],
   recorder: null,
   recordingVerse: null,
@@ -123,6 +131,12 @@ function assignedReader(verse) {
   const localName = slot === "A" ? state.readerA : state.readerB;
   return { slot, name: roomSync.nameForSlot(slot) || localName };
 }
+function currentVoice() {
+ const slot = roomSync.currentSlot() || state.deviceReader;
+ const localName = slot === "A" ? state.readerA : state.readerB;
+ return { slot, name: roomSync.nameForSlot(slot) || localName };
+}
+
 
 function allRecords() {
   const merged = new Map();
@@ -294,17 +308,81 @@ async function copyRoomLink() {
   }
 }
 
+function moveToVerse(verse, message = "") {
+ const row = versesEl.querySelector('[data-verse="' + verse + '"]');
+ if (!row) return;
+ versesEl.querySelectorAll(".is-next").forEach(el => el.classList.remove("is-next"));
+ row.classList.add("is-next");
+ row.scrollIntoView({ behavior: "smooth", block: "center" });
+ if (message) { status(message); $("gamePrompt").textContent = message; }
+}
 function nextMine() {
-  const activeSlot = roomSync.currentSlot() || state.deviceReader;
-  const next = CHAPTER.verses.find(([verse]) => assignedReader(verse).slot === activeSlot && !latestForVerse(verse));
-  if (!next) {
-    status("Your assigned verses are all witnessed.");
-    return;
-  }
-  const row = versesEl.querySelector('[data-verse="' + next[0] + '"]');
-  versesEl.querySelectorAll(".is-next").forEach(el => el.classList.remove("is-next"));
-  row?.classList.add("is-next");
-  row?.scrollIntoView({ behavior: "smooth", block: "center" });
+ const selected = state.duetMode
+  ? CHAPTER.verses.find(([verse]) => assignedReader(verse).slot === currentVoice().slot && !latestForVerse(verse))
+  : CHAPTER.verses.find(([verse]) => !latestForVerse(verse));
+ if (!selected) { status("Every address has a witness. Another take is always welcome."); return; }
+ moveToVerse(selected[0], "An open door: Matthew 5:" + selected[0] + ". Entirely your choice.");
+}
+
+
+function gameView() {
+ return summarizeWitnessGame(allRecords(), state.playbacks, {
+  slot: currentVoice().slot, chapterId: CHAPTER.id, totalVerses: CHAPTER.verses.length
+ });
+}
+function escapeGame(v) {
+ return String(v ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ })[c]);
+}
+function renderGame() {
+ const game=gameView();
+ $("gameCoverage").textContent=game.coverage+"/"+game.totalVerses;
+ $("gameTakes").textContent=game.totalTakes;
+ $("gameVoices").textContent=game.voices.length;
+ $("gameGlimmers").textContent=game.glimmers;
+ $("gameProgress").setAttribute("aria-valuenow",String(game.coverage));
+ $("gameProgressFill").style.width=(game.coverage/game.totalVerses*100).toFixed(2)+"%";
+ $("gameTrail").textContent=game.coverage+" of "+game.totalVerses+
+   " passage addresses have recordings; longest uninterrupted stretch: "+game.longestPath+
+   "; possible cross-voice transitions: "+game.changedVoiceEdges+
+   ". Voice "+currentVoice().slot+" appears at "+game.voicePassages+
+   " addresses (declared label, not identity verification).";
+ const quests=[
+  ["Leave one voice","Record a passage of your choice. Nothing is reserved.",game.totalTakes>0],
+  ["Listen all the way through","Complete playback of one human recording on this device.",game.locallyPlayed>=1],
+  ["Welcome a second voice","Different readers may leave takes for one shared chapter.",game.hasTwoVoices],
+  ["Open three addresses","Three distinct passage addresses now carry human audio.",game.coverage>=3],
+  ["Let a passage hold abundance","Two takes at the same address coexist without replacement.",game.abundance>=1]
+ ];
+ $("gameQuests").innerHTML=quests.map(([title,detail,done])=>
+  '<article class="game-quest"><small>'+(done?"RECORDED IN THE CORPUS":"OPEN INVITATION")+
+  '</small><strong>'+escapeGame(title)+'</strong><p>'+escapeGame(detail)+'</p></article>').join("");
+ $("gameBadges").innerHTML=game.badges.map(b=>
+  '<article class="game-badge '+(b.achieved?"earned":"locked")+'"><small>'+
+  (b.achieved?"CONSTELLATION LIT":"STILL POSSIBLE")+'</small><strong>'+
+  escapeGame(b.title)+'</strong><p>'+escapeGame(b.detail)+'</p></article>').join("");
+}
+function recordPlaybackCompletion(record) {
+ const event=makePlaybackReceipt(record);
+ if (!event) return;
+ const updated=addPlaybackReceipt(state.playbacks,event);
+ if (updated.length===state.playbacks.length) return;
+ state.playbacks=updated;
+ try { localStorage.setItem(PLAYBACK_KEY,JSON.stringify(updated)); }
+ catch { status("Playback completed, but game progress could not be saved on this device."); }
+ renderGame();
+}
+function exportGameReview() {
+ const review=makeGameReviewPacket(gameView(),{
+  // A WITNESS shared-room UUID is an invite capability. Never export it by default.
+  roomId:null, edition:CHAPTER.edition.id
+ });
+ const blob=new Blob([JSON.stringify(review,null,2)],{type:"application/json"});
+ const url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download="WITNESS__freeplay-review__matthew-5.json";link.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ status("Exported a metadata-only game review. No audio, Scripture text, passwords or Full Measure awards.");
 }
 
 function render() {
@@ -316,6 +394,7 @@ function render() {
   $("readerB").disabled = Boolean(cloudB);
   $("deviceReader").value = roomSync.currentSlot() || state.deviceReader;
   renderRoomPanel();
+  $("duetMode").checked = state.duetMode;
 
   versesEl.innerHTML = "";
   let complete = 0;
@@ -327,7 +406,7 @@ function render() {
     if (latest) complete += 1;
 
     const row = document.createElement("article");
-    row.className = "verse" + (assigned.slot === activeSlot ? " assigned-here" : "");
+    row.className = "verse" + (state.duetMode && assigned.slot === activeSlot ? " assigned-here" : "");
     row.dataset.verse = verse;
 
     const top = document.createElement("div");
@@ -338,8 +417,8 @@ function render() {
     number.textContent = "Matthew 5:" + verse;
 
     const who = document.createElement("span");
-    who.className = "assignee";
-    who.textContent = assigned.name;
+    who.className = "assignee" + (state.duetMode ? "" : " free");
+    who.textContent = state.duetMode ? "Duet: " + assigned.name : "Free to read";
 
     top.append(number, who);
 
@@ -353,7 +432,7 @@ function render() {
     const record = document.createElement("button");
     record.className = "record";
     record.textContent = state.recordingVerse === verse ? "Stop & keep take" : latest ? "Record another take" : "Record verse";
-    record.disabled = assigned.slot !== activeSlot || (state.recordingVerse !== null && state.recordingVerse !== verse);
+    record.disabled = (state.duetMode && assigned.slot !== activeSlot) || (state.recordingVerse !== null && state.recordingVerse !== verse);
     if (state.recordingVerse === verse) record.classList.add("recording");
     record.addEventListener("click", () => toggleRecording(verse));
 
@@ -378,7 +457,8 @@ function render() {
     versesEl.append(row);
   }
 
-  $("progress").textContent = complete + " / " + CHAPTER.verses.length + " witnessed";
+  $("progress").textContent = complete + " / " + CHAPTER.verses.length + " passage addresses";
+  renderGame();
 }
 
 async function toggleRecording(verse) {
@@ -409,7 +489,7 @@ async function toggleRecording(verse) {
     recorder.onstop = async () => {
       try {
         const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "audio/webm" });
-        const assigned = assignedReader(verse);
+        const assigned = state.duetMode ? assignedReader(verse) : currentVoice();
         const now = new Date().toISOString();
         const recordingId = "wit-" + CHAPTER.id.replace(".", "-") + "-v" + String(verse).padStart(3, "0") + "-" + crypto.randomUUID();
         const record = {
@@ -460,7 +540,7 @@ async function playRecord(record) {
   try {
     const url = await audioUrl(record);
     const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
+    audio.onended = () => { URL.revokeObjectURL(url); recordPlaybackCompletion(record); };
     audio.onerror = () => URL.revokeObjectURL(url);
     await audio.play();
   } catch (error) {
@@ -505,26 +585,23 @@ async function playChapter() {
 }
 
 async function playAndWait(record, token) {
-  const url = await audioUrl(record);
-  return new Promise(resolve => {
-    const audio = new Audio(url);
-    const done = () => {
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    audio.onended = done;
-    audio.onerror = done;
-    audio.play().catch(done);
-
-    const watcher = setInterval(() => {
-      if (token !== state.chapterAbort) {
-        clearInterval(watcher);
-        audio.pause();
-        done();
-      }
-      if (audio.ended) clearInterval(watcher);
-    }, 150);
-  });
+ const url = await audioUrl(record);
+ return new Promise(resolve => {
+  const audio = new Audio(url);
+  let settled = false, watcher;
+  const done = heardToEnd => {
+   if (settled) return;
+   settled = true;
+   clearInterval(watcher);
+   URL.revokeObjectURL(url);
+   if (heardToEnd && token === state.chapterAbort) recordPlaybackCompletion(record);
+   resolve();
+  };
+  audio.onended = () => done(true);
+  audio.onerror = () => done(false);
+  watcher = setInterval(() => { if (token !== state.chapterAbort) {audio.pause();done(false);} }, 150);
+  audio.play().catch(() => done(false));
+ });
 }
 
 function stopChapter() {
@@ -575,11 +652,11 @@ async function exportPackage() {
       text_edition: CHAPTER.edition
     },
     session: {
-      strategy: "alternating-verses",
+      strategy: state.duetMode ? "alternating-verses" : "free-witness",
       reader_a: state.readerA,
       reader_b: state.readerB,
-      odd_verses: "A",
-      even_verses: "B"
+      odd_verses: state.duetMode ? "A" : null,
+      even_verses: state.duetMode ? "B" : null
     },
     recordings: exported
   };
@@ -645,6 +722,37 @@ $("playChapter").addEventListener("click", playChapter);
 $("stopChapter").addEventListener("click", stopChapter);
 $("exportPackage").addEventListener("click", exportPackage);
 $("importPackage").addEventListener("change", event => importPackage(event.target.files?.[0]));
+
+$("duetMode").addEventListener("change",event=>{
+ state.duetMode=event.target.checked;
+ localStorage.setItem("witness.duetMode",String(state.duetMode));
+ render();
+ status(state.duetMode
+  ? "Optional duet experiment enabled: odd/even voice prompts."
+  : "Free WITNESS mode: choose any passage you wish.");
+});
+$("openDoorButton").addEventListener("click",()=>{
+ const game=gameView(),index=Math.floor(Math.random()*Math.max(1,game.openVerses.length));
+ const verse=suggestOpenDoor(game,index);
+ if(verse===null){$("gamePrompt").textContent="Every address has a take. Revisit any passage freely.";return;}
+ moveToVerse(verse,"Possible opening: Matthew 5:"+verse+". Read, listen, or pass.");
+});
+$("surpriseVerseButton").addEventListener("click",()=>{
+ const [verse]=CHAPTER.verses[Math.floor(Math.random()*CHAPTER.verses.length)];
+ moveToVerse(verse,"Surprise passage: Matthew 5:"+verse+". This is an invitation, not an assignment.");
+});
+$("unheardButton").addEventListener("click",()=>{
+ const game=gameView(),heard=new Set(state.playbacks.map(r=>r.recordingId));
+ const pick=game.takes.find(t=>t.slot!==currentVoice().slot&&!heard.has(t.recordingId))
+  ||suggestUnheardVoice(game,state.playbacks);
+ if(!pick){$("gamePrompt").textContent="No unplayed takes are available yet. Record or import one when you wish.";return;}
+ const record=allRecords().find(t=>t.recording_id===pick.recordingId);
+ moveToVerse(pick.verse,"A voice at Matthew 5:"+pick.verse+" is ready to hear.");
+ if(record)void playRecord(record);
+});
+$("exportForPact").addEventListener("click",exportPackage);
+$("exportGameReview").addEventListener("click",exportGameReview);
+
 
 async function boot() {
   try {

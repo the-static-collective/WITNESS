@@ -10,8 +10,8 @@
 <body>
   <header class="hero">
     <p class="kicker">WITNESS / SLICE-001</p>
-    <h1>Matthew 5<br><span>two voices, one chapter</span></h1>
-    <p class="lede">Record one verse. The room assembles the chapter while both phones keep their own receipts.</p>
+    <h1>Matthew 5<br><span>many voices, one living chapter</span></h1>
+    <p class="lede">Choose a passage. Leave a human voice. Explore an unfolding community mosaic, with local-first receipts and optional two-player quests.</p>
   </header>
 
   <main>
@@ -21,7 +21,7 @@
           <p class="eyebrow">Session</p>
           <h2 id="setup-title">Who is reading?</h2>
         </div>
-        <div id="progress" class="progress">0 / 48 witnessed</div>
+        <div id="progress" class="progress">0 / 48 passage addresses</div>
       </div>
 
       <div class="reader-grid">
@@ -36,13 +36,17 @@
       </div>
 
       <label class="device-select">
-        <span>This device is</span>
+        <span>This device is (for duet identity, not a verse restriction)</span>
         <select id="deviceReader">
           <option value="A">Voice A</option>
           <option value="B">Voice B</option>
         </select>
       </label>
 
+      <label class="duet-toggle">
+        <input id="duetMode" type="checkbox" />
+        <span><strong>Play the alternating-voice duet experiment</strong><small>Optional: odd/even voice prompts. Free choice is the default; the chapter itself belongs to no player.</small></span>
+      </label>
       <div class="room-panel">
         <div class="room-line">
           <span id="roomBadge" class="room-badge">local only</span>
@@ -58,7 +62,7 @@
       </div>
 
       <div class="actions">
-        <button id="nextMine" class="primary">Next mine</button>
+        <button id="nextMine" class="primary">Find an opening</button>
         <button id="playChapter" class="primary">Play assembled chapter</button>
         <button id="stopChapter">Stop</button>
         <button id="exportPackage">Export backup package</button>
@@ -69,6 +73,48 @@
       </div>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel expedition" aria-labelledby="expeditionTitle">
+      <div class="section-head">
+        <div><p class="eyebrow">WITNESS / FREEPLAY-001</p><h2 id="expeditionTitle">The Living Chapter</h2></div>
+        <span class="quest-token">Cooperative expedition</span>
+      </div>
+      <p class="game-intro">The journey is yours to choose. The map celebrates audio contributions, new voices, and completed listening—not faithfulness, righteousness, or human worth. Every passage can welcome more than one witness.</p>
+      <div class="game-stats" aria-label="Community exploration statistics">
+        <div><strong id="gameCoverage">0/48</strong><span>passages carrying a voice</span></div>
+        <div><strong id="gameTakes">0</strong><span>individual recorded takes</span></div>
+        <div><strong id="gameVoices">0</strong><span>distinct voice labels</span></div>
+        <div><strong id="gameGlimmers">0</strong><span>chapter glimmers (play only)</span></div>
+      </div>
+      <div class="expedition-track" role="progressbar" aria-label="Chapter address coverage" aria-valuemin="0" aria-valuemax="48" aria-valuenow="0" id="gameProgress"><span id="gameProgressFill"></span></div>
+      <p class="game-caption" id="gameTrail">No recording receipts yet. Every voice is welcome.</p>
+      <div class="game-tools">
+        <button id="openDoorButton" class="primary">Find an open passage</button>
+        <button id="surpriseVerseButton">Surprise passage</button>
+        <button id="unheardButton">Find an unheard take</button>
+      </div>
+      <p id="gamePrompt" class="game-prompt" role="status">All of these are invitations, not assignments.</p>
+      <div class="game-columns">
+        <section aria-labelledby="gamePathsHeading">
+          <h3 id="gamePathsHeading">Three paths into the chapter</h3>
+          <div id="gameQuests" class="game-quests"></div>
+        </section>
+        <section aria-labelledby="gameBadgesHeading">
+          <h3 id="gameBadgesHeading">Collected constellations</h3>
+          <div id="gameBadges" class="game-badges"></div>
+        </section>
+      </div>
+      <div class="game-bridge">
+        <div>
+          <strong>Bring a recording to THE PACT</strong>
+          <p>Export the WITNESS package, then import it in your private PACT room's WITNESS tab. Each system keeps its own authority; neither automatically awards a Full Measure Deed.</p>
+        </div>
+        <div class="game-bridge-actions">
+          <button id="exportForPact">Export recording package</button>
+          <button id="exportGameReview">Export game review packet</button>
+        </div>
+      </div>
     </section>
 
     <section class="chapter-meta">
